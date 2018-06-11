@@ -33,33 +33,16 @@ async def send_frame(frame_cluster, host, port, cluster_num, filename, total_clu
     try:
         # Pickle the array of frames.
         frame_cluster.insert(0, {"file_name": filename, "cluster_num": cluster_num, "total_clusters": total_clusters})
-        if not os.path.exists(os.path.dirname(filename)):
-            os.makedirs(os.path.dirname(filename))
-        filename = "/tmp/VideoSearchEngine/cluster:" + str(cluster_num) + "distributer.pkl"
-        f = open(filename,'wb')
-        pickle.dump(frame_cluster, f)
-        f.close()
+        data = pickle.dumps(frame_cluster)
 
         # Create a socket object
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        # Send pickle file over the network to server.
+        # Send byte object over the network to server.
         print("Sending cluster to worker: " + str(host) + ":" + str(port))
         s.connect((host, port))
-        f = open(filename,'rb')
-        data = f.read(1024)
-        while (data):
-            s.send(data)
-            data = f.read(1024)
-        f.close()
+        s.sendall(data)
         s.close() 
-
-        # Clean up pickle file, comment out to retain pickle files
-        if os.path.isfile(filename):
-            try:
-                os.remove(filename)
-            except OSError as e:  # if failed, report it back to the user
-                print ("Error: %s - %s." % (e.filename, e.strerror))
     except Exception as e:
         print(e)
     asyncio.sleep(random.randint(1,3))

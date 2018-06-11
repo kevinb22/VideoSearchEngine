@@ -37,32 +37,21 @@ def finished(filename, summary, total_num):
 
 def thread_main(conn, count):
     # Accept the pickle file sent by VideoDistributer.py and write/cache to local copy.
-    filename = "/tmp/VideoSearchEngine/count:" + str(count) + "|" + "host:" + socket.gethostname() + "|" + "port:" + str(port) + "|" + "collector.pkl"
-    if not os.path.exists(os.path.dirname(filename)):
-        os.makedirs(os.path.dirname(filename))
-    f = open(filename,'wb')
+    data_list = []
     data = conn.recv(1024)
+    data_list.append(data)
     while data:
-        f.write(data)
         data = conn.recv(1024)
-    f.close()
+        data_list.append(data)
     conn.close()
+    all_data = b''.join(data_list)
 
     # De-pickle file to reconstruct array of images, manipulate as needed.
-    f = open(filename,'rb')
     try:
-        unpickled_data = pickle.load(f)
+        unpickled_data = pickle.loads(all_data)
     except Exception as e:
         print(e)
         unpickled_data = []
-    f.close()
-
-    # Clean up pickle file, comment out to retain pickle files
-    if os.path.isfile(filename):
-        try:
-            os.remove(filename)
-        except OSError as e:  # if failed, report it back to the user
-            print ("Error: %s - %s." % (e.filename, e.strerror))
     
     metadata = unpickled_data[0]
     cluster_filename = metadata["file_name"]

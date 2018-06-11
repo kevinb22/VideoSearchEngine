@@ -21,37 +21,24 @@ import random
 
 
 def thread_main(conn, captioner, count, host, port):
-    # Accept the pickle file sent by VideoDistributer.py and write/cache to local copy.
-    filename_recv = "/tmp/VideoSearchEngine/recievecluster:" + str(count) + "|" + "host:" + socket.gethostname() + "|" + "worker.pkl"
-    if not os.path.exists(os.path.dirname(filename_recv)):
-        os.makedirs(os.path.dirname(filename_recv))
-    f_recv = open(filename_recv,'wb')
-    print("Writing file {}".format(filename_recv))
+    # Accept the byte chunks sent by VideoDistributer.py and join aggregate toegther
+    data_list = []
     data = conn.recv(1024)
+    data_list.append(data)
     while data:
-        f_recv.write(data)
         data = conn.recv(1024)
+        data_list.append(data)
     conn.close()
-    f_recv.close()
+    all_data = b''.join(data_list)
 
-
-    # De-pickle file to reconstruct array of images, manipulate as needed.
-    f_recv = open(filename_recv,'rb')
+    # De-pickle bytes to reconstruct array of images, manipulate as needed.
     try:
-        unpickled_data = pickle.load(f_recv)
+       unpickled_data = pickle.loads(all_data)
     except Exception as e:
-        print(e)
-        unpickled_data = []
-    f_recv.close()
+       print(e)
+       unpickled_data = []
 
-    # Clean up pickle file, comment out to retain pickle files
-    if os.path.isfile(filename_recv):
-        try:
-            os.remove(filename_recv)
-        except OSError as e:  # if failed, report it back to the user
-            print ("Error: %s - %s." % (e.filename, e.strerror))
-
-    #TODO: Implement what needs to happen with the unpickled_data
+    # Insert metadata header and generate captions
     metadata = unpickled_data[0]
     unpickled_cluster_filename = metadata["file_name"]  # unpickled_data[0]
     unpickled_cluster_num = metadata["cluster_num"]  # unpickled_data[1]
@@ -70,13 +57,7 @@ def thread_main(conn, captioner, count, host, port):
        
     # Pickle the array of summaries.
     summaries.insert(0, {"file_name": unpickled_cluster_filename, "cluster_num": unpickled_cluster_num, "total_clusters": total_clusters})
-    # summaries.insert(0, unpickled_cluster_filename)
-    # summaries.insert(1, unpickled_cluster_num)
-    filename_send = "/tmp/VideoSearchEngine/sendcluster:" + str(count) + "|" + "host:" + str(host) + "|" + "worker.pkl"
-    print("Writing file {}".format(filename_send))
-    f_send = open(filename_send,'wb')
-    pickle.dump(summaries, f_send)
-    f_send.close()
+    data = pickle.dumps(summaries)
 
     # Create a socket object
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -84,20 +65,8 @@ def thread_main(conn, captioner, count, host, port):
     # Send pickle file over the network to server.
     print("Sending cluster " + str(unpickled_cluster_num) + " to collector: " + str(host) + ":" + str(port))
     s.connect((host, port))
-    f_send = open(filename_send,'rb')
-    data = f_send.read(1024)
-    while (data):
-        s.send(data)
-        data = f_send.read(1024)
-    f_send.close()
-    s.close()
-
-    # Clean up pickle file, comment out to retain pickle files
-    if os.path.isfile(filename_send):
-        try:
-            os.remove(filename_send)
-        except OSError as e:  # if failed, report it back to the user
-            print ("Error: %s - %s." % (e.filename, e.strerror))
+    s.sendall(data)
+    s.close() 
     
 def load_necessary():
     captioner = ImageCaptioner()
