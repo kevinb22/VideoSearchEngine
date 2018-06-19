@@ -9,25 +9,106 @@ Authors:
 
 Semantically be able to search through a database of videos (using generated summaries)
 
+Take a look at our [poster](VideoSearchEnginePoster.pdf)
+
+## Table of Contents
+
+* [System Overview](#system-overview)
+* [Video Summarization Overview](#video-summarization-overview)
+* [Example output](#example-output)
+* [User Interface](#user-interface)
+* [Set Up](#set-up)
+* [Training Captioning Network](#training-captioning-network)
+* [Plan](#plan)
+* [Data Sets](#data-sets-to-use)
+* [Citations](#citations)
+
 ## System Overview
 
-The system described here is the overview of the overall system archietecture.
+The video below shows exactly how the entire system works end to end.
+
+![Presentation](figs/presentation.gif)
+
+The user facing system described here is the overview of the overall system architecture.
 
 ![System Overview](figs/SystemOverview.png)
 
+The backend and video summarizing system was distributed in an attempt to tackle large videos. The architecture is described in the image below
+
+![Distribution](figs/distribution.png)
+
+
 ## Video Summarization Overview
+
+In this project, we attempted to solve video summarizatoin using image captioning. The architecture and motivation is explained in this section.
 
 Below is the initial architecture of the video summarization network used to generate video summaries.
 
 ![Video Summarization Network](figs/VideoSummarizationNetwork.png)
 
+We converted this into the following network for the final project
+
+![Final Network](figs/summarization.png)
+
+We can walk through the steps occuring with explantions here:
+
+1. We break apart frames into semantically different groups.
+
+    * Here we use `SSMI` (structured similarity measurment index) to determine if two frames are similar
+    * We define a threshold for comparison
+    * Any sequence of frames within that threshold belongs to a specific group.
+
+2. Random Sample from each group
+    * Since each group are all the semantically similar frames, to reduce the redundancies in the frame captions we try to remove similar frames by selecting a very small subset (1-5) frames from each group
+
+3. Feed each selected frame to an image captioning network to determine what happens in the frame
+    * This uses an Encoder-Decoder model for captioning the images as descibed in [Object2Text](https://arxiv.org/abs/1707.07102)
+    * Model description
+        * `Encoder`
+            * `EncoderCNN`
+                * Uses ResNet-152 pretrained to feed all the features to an encoded feature vector
+            * `YoloEncoder`
+                * From a frame performs bounding box object detection on the frame to determine the objects and the bounding boxes for all of them.
+                * Uses RNN structure (LSTM for this model) to encode the sequence of objects and their names
+                * Uses the resul to create another encoded feature vector
+        * `Decoder`
+            * Combines the two feature vectors from the `EncoderCNN` and the `YoloEncoder` to create a new feature vector, and uses that feature vector as input to start language generation for the frame caption
+    * Training
+        * **Dataset:** uses COCO for training
+        * **Bounding Box:** during train uses `TinyYOLO` for faster training time as well as allowing the network to use a less reliable network to train on, and the more reliable version during testing
+4. Uses `Extractive Summarization` to select unique phrases from all the frame captions seletected to create a reasonable description of what occured in the video.
+
+The next section shows example output:
+
 ## Example output
 
 Given a minute long video of traffic in Dhaka Bangladesh.
 
+```python
+(
+    'a man riding a bike down a street next to a large truck .',
+    'a man riding a bike down a street next to a traffic light .',
+    'a green truck with a lot of cars on it',
+    'a green truck with a lot of cars on the road .',
+    'a city bus driving down a street next to a traffic light .'
+)
 ```
-('a man riding a bike down a street next to a large truck .', 'a man riding a bike down a street next to a traffic light .', 'a green truck with a lot of cars on it', 'a green truck with a lot of cars on the road .', 'a city bus driving down a street next to a traffic light .')
-```
+
+## User Interface
+
+To use our search engine we built a `Flask` based application similar to google to search through our database.
+
+### Main UI
+
+This page features the main search functionality. A simplistic design similar to Google.
+
+![main](figs/ui-main.png)
+
+### Results UI
+
+This page features all the results for a given query. Every video in our database is returned in sorted order for relevance. We use `TF-IDF` scoring for a query to a rank for each of the summaries.
+
+![results](figs/ui-search.png)
 
 ## Set Up
 
@@ -83,14 +164,6 @@ Our project will, broadly defined, be attempting video searching through video s
 * Merge summaries of all frames of a video into one large overall summary
 * Build a search engine to query videos via summary.
 
-## Goals
-
-For our project, we have come up with a basic goal we plan to reach by the time of the presentation, and a stretch goal we hope to reach if time permits
-
-**Basic Goal:** We will recognize objects through the [YOLO algorithm](https://pjreddie.com/darknet/yolo/). Convert each frame to text using the algorithm mentioned in this [paper](https://arxiv.org/abs/1707.07102). Come up with basic heuristic for skipping frames so not too much overlap in the summary. Surface all of this through a simple UI to search a video database.
-
-**Stretch Goal:** Investigate other methods for reducing noise in frames (Generative Adversarial Networks), Investigate grouping together semantically similar frames to one common representation to make better summaries.
-
 ## Data Sets to Use
 
 ### [TaCos MulitModal Data Set](https://www.mpi-inf.mpg.de/departments/computer-vision-and-multimodal-computing/research/vision-and-language/tacos-multi-level-corpus/)
@@ -132,7 +205,7 @@ The "MED Summaries" is a new dataset for evaluation of dynamic video summaries. 
 * [Tiny YOLO Implementation](https://github.com/marvis/pytorch-yolo2)
 * [machinebox -> video analysis/frame partitioning](https://github.com/machinebox/videoanalysis)
 * [Code to break video into frames](https://gist.github.com/keithweaver/70df4922fec74ea87405b83840b45d57)
-* [Po-Hsun-Su/pytorch-ssim] (https://github.com/Po-Hsun-Su/pytorch-ssim)
+* [Po-Hsun-Su/pytorch-ssim](https://github.com/Po-Hsun-Su/pytorch-ssim)
 
 ### Blogs and Other Websites
 
