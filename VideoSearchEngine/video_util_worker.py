@@ -19,7 +19,6 @@ from ImageCaptioner import ImageCaptioner
 import video_utils
 import random
 
-
 def thread_main(conn, captioner, count, host, port):
     # Accept the byte chunks sent by VideoDistributer.py and join aggregate toegther
     data_list = []
